@@ -215,6 +215,10 @@ async def submit_upi_payment(
     if user_doc.get("payment_paid", False):
         raise HTTPException(status_code=400, detail="Payment already completed")
     
+    # Check if payment is already pending verification
+    if user_doc.get("payment_status") == "pending":
+        raise HTTPException(status_code=400, detail="Payment already submitted and pending verification")
+    
     # Read screenshot file
     screenshot_data = await screenshot.read()
     screenshot_base64 = base64.b64encode(screenshot_data).decode('utf-8')
