@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,10 +7,11 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import bcrypt
+import jwt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,52 +21,172 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'studentsnet_secret_key_2025')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24
+
 # Create the main app without a prefix
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+security = HTTPBearer()
 
 # Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+class UserRegister(BaseModel):
+    name: str
+    college: str
+    class_name: str = Field(alias="class")
+    stream: str
+    contact: str
+    password: str
+
+class UserLogin(BaseModel):
+    contact: str
+    password: str
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    id: str
+    name: str
+    college: str
+    class_name: str
+    stream: str
+    contact: str
+    created_at: str
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class LoginResponse(BaseModel):
+    token: str
+    user: User
 
-# Add your routes to the router instead of directly to app
+class StudentProfile(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str
+    name: str
+    college: str
+    class_name: str
+    stream: str
+
+# Helper Functions
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_token(user_id: str) -> str:
+    expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    payload = {
+        'user_id': user_id,
+        'exp': expiration
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "StudentsNet API"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
+@api_router.post("/register", response_model=LoginResponse)
+async def register(user_data: UserRegister):
+    # Check if user already exists
+    existing_user = await db.users.find_one({"contact": user_data.contact}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User with this contact already exists")
     
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
+    # Create user document
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": user_id,
+        "name": user_data.name,
+        "college": user_data.college,
+        "class_name": user_data.class_name,
+        "stream": user_data.stream,
+        "contact": user_data.contact,
+        "password_hash": hash_password(user_data.password),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
     
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+    await db.users.insert_one(user_doc)
+    
+    # Create token
+    token = create_token(user_id)
+    
+    # Return user without password
+    user = User(
+        id=user_doc["id"],
+        name=user_doc["name"],
+        college=user_doc["college"],
+        class_name=user_doc["class_name"],
+        stream=user_doc["stream"],
+        contact=user_doc["contact"],
+        created_at=user_doc["created_at"]
+    )
+    
+    return LoginResponse(token=token, user=user)
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+@api_router.post("/login", response_model=LoginResponse)
+async def login(login_data: UserLogin):
+    # Find user by contact
+    user_doc = await db.users.find_one({"contact": login_data.contact}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
+    # Verify password
+    if not verify_password(login_data.password, user_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    return status_checks
+    # Create token
+    token = create_token(user_doc["id"])
+    
+    # Return user without password
+    user = User(
+        id=user_doc["id"],
+        name=user_doc["name"],
+        college=user_doc["college"],
+        class_name=user_doc["class_name"],
+        stream=user_doc["stream"],
+        contact=user_doc["contact"],
+        created_at=user_doc["created_at"]
+    )
+    
+    return LoginResponse(token=token, user=user)
+
+@api_router.get("/profile", response_model=User)
+async def get_profile(user_id: str = Depends(verify_token)):
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return User(**user_doc)
+
+@api_router.get("/students", response_model=List[StudentProfile])
+async def get_students(stream: Optional[str] = None, user_id: str = Depends(verify_token)):
+    query = {}
+    if stream:
+        query["stream"] = stream
+    
+    # Exclude current user and password
+    students = await db.users.find(
+        {**query, "id": {"$ne": user_id}},
+        {"_id": 0, "password_hash": 0, "contact": 0, "created_at": 0}
+    ).to_list(1000)
+    
+    return [StudentProfile(**student) for student in students]
 
 # Include the router in the main app
 app.include_router(api_router)
