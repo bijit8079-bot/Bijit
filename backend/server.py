@@ -228,7 +228,7 @@ async def create_payment_session(payment_request: PaymentSessionRequest, user_id
     # Create checkout session
     checkout_request = CheckoutSessionRequest(
         amount=MEMBERSHIP_FEE,
-        currency="usd",
+        currency="inr",
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
