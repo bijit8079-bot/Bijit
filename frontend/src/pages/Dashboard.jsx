@@ -4,8 +4,8 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
-import { LogOut, GraduationCap, Users, BookOpen, Briefcase, FlaskConical } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { LogOut, GraduationCap, Users, BookOpen, Briefcase, FlaskConical, UserCircle, Settings } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -38,8 +38,8 @@ export default function Dashboard() {
 
     const storedUser = JSON.parse(localStorage.getItem("user"));
     
-    // Check if payment is completed
-    if (!storedUser?.payment_paid) {
+    // Check if payment is completed (skip for owner)
+    if (storedUser?.role !== "owner" && !storedUser?.payment_paid) {
       navigate("/payment");
       return;
     }
@@ -97,10 +97,28 @@ export default function Dashboard() {
               <GraduationCap className="h-8 w-8 text-primary" />
               <h1 className="text-2xl font-bold text-gray-900">StudentsNet</h1>
             </div>
-            <Button variant="outline" onClick={handleLogout} data-testid="logout-btn">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-3">
+              {user.role === "owner" && (
+                <Button variant="outline" onClick={() => navigate("/admin")} data-testid="admin-panel-btn">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Admin Panel
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => navigate("/all-students")} data-testid="all-students-btn">
+                <Users className="mr-2 h-4 w-4" />
+                All Students
+              </Button>
+              {user.role === "student" && (
+                <Button variant="outline" onClick={() => navigate("/edit-profile")} data-testid="edit-profile-btn">
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleLogout} data-testid="logout-btn">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -114,9 +132,13 @@ export default function Dashboard() {
           <CardContent>
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-primary text-white text-xl">
-                  {getInitials(user.name)}
-                </AvatarFallback>
+                {user.photo ? (
+                  <AvatarImage src={`data:image/jpeg;base64,${user.photo}`} />
+                ) : (
+                  <AvatarFallback className="bg-primary text-white text-xl">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <h2 className="text-xl font-semibold" data-testid="profile-name">{user.name}</h2>
@@ -124,6 +146,7 @@ export default function Dashboard() {
                 <div className="flex gap-4 mt-1 text-sm text-gray-500">
                   <span data-testid="profile-class">Class: {user.class_name}</span>
                   <span data-testid="profile-stream">Stream: {user.stream}</span>
+                  {user.role === "owner" && <span className="text-purple-600 font-semibold">OWNER</span>}
                 </div>
               </div>
             </div>
@@ -192,9 +215,13 @@ export default function Dashboard() {
                     <CardContent className="pt-6">
                       <div className="flex items-center space-x-4">
                         <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-primary text-white">
-                            {getInitials(student.name)}
-                          </AvatarFallback>
+                          {student.photo ? (
+                            <AvatarImage src={`data:image/jpeg;base64,${student.photo}`} />
+                          ) : (
+                            <AvatarFallback className="bg-primary text-white">
+                              {getInitials(student.name)}
+                            </AvatarFallback>
+                          )}
                         </Avatar>
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg" data-testid="student-name">{student.name}</h3>
