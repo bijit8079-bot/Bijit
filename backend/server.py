@@ -125,6 +125,7 @@ async def register(user_data: UserRegister):
         "contact": user_data.contact,
         "password_hash": hash_password(user_data.password),
         "payment_paid": False,
+        "payment_status": "unpaid",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -142,7 +143,8 @@ async def register(user_data: UserRegister):
         stream=user_doc["stream"],
         contact=user_doc["contact"],
         created_at=user_doc["created_at"],
-        payment_paid=user_doc["payment_paid"]
+        payment_paid=user_doc["payment_paid"],
+        payment_status=user_doc["payment_status"]
     )
     
     return LoginResponse(token=token, user=user)
