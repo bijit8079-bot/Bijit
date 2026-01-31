@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { UserPlus, GraduationCap } from "lucide-react";
+import { UserPlus, GraduationCap, Upload } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -15,6 +15,8 @@ const API = `${BACKEND_URL}/api`;
 export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     college: "",
@@ -32,12 +34,34 @@ export default function Register() {
     setFormData({ ...formData, stream: value });
   };
 
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPhoto(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API}/register`, formData);
+      const formDataToSend = new FormData();
+      formDataToSend.append("name", formData.name);
+      formDataToSend.append("college", formData.college);
+      formDataToSend.append("class", formData.class);
+      formDataToSend.append("stream", formData.stream);
+      formDataToSend.append("contact", formData.contact);
+      formDataToSend.append("password", formData.password);
+      if (photo) {
+        formDataToSend.append("photo", photo);
+      }
+
+      const response = await axios.post(`${API}/register`, formDataToSend, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
       toast.success("Registration successful!");
@@ -63,6 +87,30 @@ export default function Register() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Photo Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="photo">Profile Photo (Optional)</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  id="photo"
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  data-testid="register-photo-input"
+                />
+              </div>
+              {photoPreview && (
+                <div className="flex justify-center">
+                  <img 
+                    src={photoPreview} 
+                    alt="Preview" 
+                    className="w-24 h-24 rounded-full object-cover border-4 border-primary"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
