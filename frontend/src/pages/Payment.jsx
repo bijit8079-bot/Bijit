@@ -11,6 +11,8 @@ import { GraduationCap, CheckCircle, Upload, Smartphone } from "lucide-react";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const QR_CODE_URL = "https://customer-assets.emergentagent.com/job_college-signup-1/artifacts/jcfjs8oz_Screenshot_20260201-015235.png";
+const UPI_ID = "bijit8079@okhdfcbank";
+const PAYMENT_AMOUNT = 299;
 
 export default function Payment() {
   const navigate = useNavigate();
