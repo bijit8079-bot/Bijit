@@ -41,7 +41,7 @@ export default function Register() {
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
       toast.success("Registration successful!");
-      navigate("/dashboard");
+      navigate("/payment");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Registration failed");
     } finally {
