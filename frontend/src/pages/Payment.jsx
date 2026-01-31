@@ -136,24 +136,58 @@ export default function Payment() {
           <div className="border-2 border-green-200 rounded-lg p-6 bg-green-50">
             <div className="flex items-center gap-2 mb-4">
               <Smartphone className="h-5 w-5 text-green-600" />
-              <h3 className="font-semibold text-lg">Scan QR Code to Pay</h3>
+              <h3 className="font-semibold text-lg">Pay via UPI</h3>
             </div>
-            <div className="flex justify-center mb-4">
-              <img 
-                src={QR_CODE_URL} 
-                alt="UPI QR Code" 
-                className="w-64 h-64 border-4 border-white rounded-lg shadow-md"
-                data-testid="upi-qr-code"
-              />
+
+            {/* Google Pay Button */}
+            <div className="mb-6">
+              <Button
+                onClick={handleGooglePay}
+                className="w-full py-6 text-lg bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-300 shadow-md"
+                data-testid="google-pay-btn"
+              >
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" 
+                  alt="Google Pay" 
+                  className="h-8 mr-3"
+                />
+                Pay with Google Pay
+              </Button>
+              <p className="text-xs text-center text-gray-500 mt-2">
+                Opens Google Pay app with ₹299 payment ready
+              </p>
             </div>
-            <div className="space-y-2 text-sm text-gray-700">
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-green-50 text-gray-600">OR</span>
+              </div>
+            </div>
+
+            {/* QR Code Section */}
+            <div>
+              <h4 className="font-medium text-center mb-3">Scan QR Code</h4>
+              <div className="flex justify-center mb-4">
+                <img 
+                  src={QR_CODE_URL} 
+                  alt="UPI QR Code" 
+                  className="w-64 h-64 border-4 border-white rounded-lg shadow-md"
+                  data-testid="upi-qr-code"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 text-sm text-gray-700 mt-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Open any UPI app (Google Pay, PhonePe, Paytm)</span>
+                <span>Click "Pay with Google Pay" button above</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Scan the QR code above</span>
+                <span>Or scan QR code with any UPI app</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
