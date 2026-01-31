@@ -27,6 +27,10 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'studentsnet_secret_key_2025')
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
 
+# Stripe Configuration
+STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY')
+MEMBERSHIP_FEE = 299.00  # Annual membership fee
+
 # Create the main app without a prefix
 app = FastAPI()
 
