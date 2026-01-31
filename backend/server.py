@@ -172,7 +172,8 @@ async def login(login_data: UserLogin):
         stream=user_doc["stream"],
         contact=user_doc["contact"],
         created_at=user_doc["created_at"],
-        payment_paid=user_doc.get("payment_paid", False)
+        payment_paid=user_doc.get("payment_paid", False),
+        payment_status=user_doc.get("payment_status", "unpaid")
     )
     
     return LoginResponse(token=token, user=user)
