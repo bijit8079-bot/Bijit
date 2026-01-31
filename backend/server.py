@@ -245,7 +245,7 @@ async def create_payment_session(payment_request: PaymentSessionRequest, user_id
         "session_id": session.session_id,
         "user_id": user_id,
         "amount": MEMBERSHIP_FEE,
-        "currency": "usd",
+        "currency": "inr",
         "payment_status": "pending",
         "purpose": "annual_membership",
         "created_at": datetime.now(timezone.utc).isoformat()
