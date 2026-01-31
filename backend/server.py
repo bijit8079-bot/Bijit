@@ -177,7 +177,8 @@ async def login(login_data: UserLogin):
         class_name=user_doc["class_name"],
         stream=user_doc["stream"],
         contact=user_doc["contact"],
-        created_at=user_doc["created_at"]
+        created_at=user_doc["created_at"],
+        payment_paid=user_doc.get("payment_paid", False)
     )
     
     return LoginResponse(token=token, user=user)
