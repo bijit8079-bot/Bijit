@@ -6,6 +6,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Payment from "./pages/Payment";
 import PaymentPending from "./pages/PaymentPending";
+import AllStudents from "./pages/AllStudents";
+import EditProfile from "./pages/EditProfile";
+import AdminPanel from "./pages/AdminPanel";
 import { Toaster } from "./components/ui/sonner";
 
 function App() {
@@ -19,6 +22,9 @@ function App() {
           <Route path="/payment" element={<Payment />} />
           <Route path="/payment-pending" element={<PaymentPending />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/all-students" element={<AllStudents />} />
+          <Route path="/edit-profile" element={<EditProfile />} />
+          <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center" richColors />
