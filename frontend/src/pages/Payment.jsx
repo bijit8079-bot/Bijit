@@ -46,6 +46,16 @@ export default function Payment() {
     }
   };
 
+  const handleGooglePay = () => {
+    // Create UPI deep link for Google Pay
+    const upiLink = `upi://pay?pa=${UPI_ID}&pn=StudentsNet&am=${PAYMENT_AMOUNT}&cu=INR&tn=Annual%20Membership%20Payment`;
+    
+    // Open UPI link (will open Google Pay or any UPI app)
+    window.location.href = upiLink;
+    
+    toast.success("Opening Google Pay... Complete payment and submit details below");
+  };
+
   const handleSubmitPayment = async () => {
     if (!transactionId.trim()) {
       toast.error("Please enter UPI Transaction ID");
