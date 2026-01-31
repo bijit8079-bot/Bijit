@@ -170,7 +170,11 @@ class StudentsNetAPITester:
         temp_token = self.token
         self.token = None
         
-        return self.run_test("Unauthorized Profile", "GET", "profile", 403)
+        success, response = self.run_test("Unauthorized Profile", "GET", "profile", 403)
+        
+        # Restore token
+        self.token = temp_token
+        return success, response
         
         # Restore token
         self.token = temp_token
