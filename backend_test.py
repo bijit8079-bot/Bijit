@@ -85,13 +85,16 @@ class StudentsNetAPITester:
     def test_register_user(self):
         """Test user registration"""
         timestamp = datetime.now().strftime('%H%M%S')
+        self.test_contact = f"9876543{timestamp[-3:]}"
+        self.test_password = "TestPass123!"
+        
         test_data = {
             "name": f"Test User {timestamp}",
             "college": "Test College",
             "class": "1st Year",
             "stream": "Science",
-            "contact": f"9876543{timestamp[-3:]}",
-            "password": "TestPass123!"
+            "contact": self.test_contact,
+            "password": self.test_password
         }
         
         success, response = self.run_test("User Registration", "POST", "register", 200, test_data)
@@ -101,6 +104,7 @@ class StudentsNetAPITester:
             self.user_id = response['user']['id']
             print(f"   Token obtained: {self.token[:20]}...")
             print(f"   User ID: {self.user_id}")
+            print(f"   Contact: {self.test_contact}")
             return True, response
         
         return False, response
