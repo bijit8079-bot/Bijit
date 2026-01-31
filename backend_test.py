@@ -341,6 +341,7 @@ class StudentsNetAPITester:
         
         # Test registration flow
         self.test_register_user()
+        self.test_register_duplicate_user()
         
         # Test login flow
         self.test_login_valid_credentials()
@@ -355,8 +356,10 @@ class StudentsNetAPITester:
         self.test_get_students_by_stream()
         
         # Test payment flow
-        self.test_create_payment_session()
-        self.test_payment_status_check()
+        self.test_payment_status_initial()
+        self.test_submit_upi_payment()
+        self.test_payment_status_after_submission()
+        self.test_duplicate_payment_submission()
         
         # Print summary
         print("\n" + "=" * 50)
