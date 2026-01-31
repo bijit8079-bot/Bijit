@@ -82,7 +82,7 @@ export default function Payment() {
           <div className="border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
             <div className="flex justify-between items-center mb-4">
               <span className="text-lg font-medium">Annual Membership</span>
-              <span className="text-2xl font-bold text-primary">$299</span>
+              <span className="text-2xl font-bold text-primary">₹299</span>
             </div>
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center gap-2">
