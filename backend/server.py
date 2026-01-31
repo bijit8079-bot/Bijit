@@ -23,7 +23,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'studentsnet_secret_key_2025')
+JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
 
@@ -31,8 +31,8 @@ JWT_EXPIRATION_HOURS = 24
 MEMBERSHIP_FEE = 299.00  # Annual membership fee in INR
 
 # Owner credentials
-OWNER_CONTACT = "owner@studentsnet"
-OWNER_PASSWORD = "owner@2025"  # Default password, should be changed
+OWNER_CONTACT = os.environ['OWNER_CONTACT']
+OWNER_PASSWORD = os.environ['OWNER_PASSWORD']
 
 # Create the main app without a prefix
 app = FastAPI()
