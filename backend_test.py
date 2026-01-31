@@ -129,15 +129,13 @@ class StudentsNetAPITester:
 
     def test_login_valid_credentials(self):
         """Test login with valid credentials"""
-        if not self.user_id:
-            self.log_test("Valid Login", False, "No registered user to login with")
+        if not self.test_contact or not self.test_password:
+            self.log_test("Valid Login", False, "No registered user credentials available")
             return False, {}
             
-        # Extract contact from previous registration
-        timestamp = datetime.now().strftime('%H%M%S')
         login_data = {
-            "contact": f"9876543{timestamp[-3:]}",
-            "password": "TestPass123!"
+            "contact": self.test_contact,
+            "password": self.test_password
         }
         
         success, response = self.run_test("Valid Login", "POST", "login", 200, login_data)
