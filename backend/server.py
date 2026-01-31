@@ -202,6 +202,163 @@ async def get_students(stream: Optional[str] = None, user_id: str = Depends(veri
     
     return [StudentProfile(**student) for student in students]
 
+# Payment Routes
+@api_router.post("/payment/create-session", response_model=PaymentSessionResponse)
+async def create_payment_session(payment_request: PaymentSessionRequest, user_id: str = Depends(verify_token)):
+    # Check if user already paid
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user_doc.get("payment_paid", False):
+        raise HTTPException(status_code=400, detail="Payment already completed")
+    
+    # Initialize Stripe
+    origin_url = payment_request.origin_url
+    webhook_url = f"{origin_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    # Create URLs
+    success_url = f"{origin_url}/payment-success?session_id={{{{CHECKOUT_SESSION_ID}}}}"
+    cancel_url = f"{origin_url}/payment"
+    
+    # Create checkout session
+    checkout_request = CheckoutSessionRequest(
+        amount=MEMBERSHIP_FEE,
+        currency="usd",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "user_id": user_id,
+            "purpose": "annual_membership"
+        }
+    )
+    
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Create payment transaction record
+    transaction_doc = {
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "user_id": user_id,
+        "amount": MEMBERSHIP_FEE,
+        "currency": "usd",
+        "payment_status": "pending",
+        "purpose": "annual_membership",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.payment_transactions.insert_one(transaction_doc)
+    
+    return PaymentSessionResponse(
+        url=session.url,
+        session_id=session.session_id,
+        amount=MEMBERSHIP_FEE
+    )
+
+@api_router.get("/payment/status/{session_id}")
+async def check_payment_status(session_id: str, user_id: str = Depends(verify_token)):
+    # Check transaction in database
+    transaction = await db.payment_transactions.find_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # If already marked as paid, return success
+    if transaction.get("payment_status") == "paid":
+        return {
+            "status": "complete",
+            "payment_status": "paid",
+            "message": "Payment completed successfully"
+        }
+    
+    # Check with Stripe
+    webhook_url = "dummy_webhook"  # Not used for status check
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    try:
+        checkout_status = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Update transaction and user if payment is successful
+        if checkout_status.payment_status == "paid" and transaction.get("payment_status") != "paid":
+            # Update transaction
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {
+                    "$set": {
+                        "payment_status": "paid",
+                        "status": checkout_status.status,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                }
+            )
+            
+            # Update user payment status
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {"payment_paid": True}}
+            )
+        
+        return {
+            "status": checkout_status.status,
+            "payment_status": checkout_status.payment_status,
+            "amount_total": checkout_status.amount_total,
+            "currency": checkout_status.currency
+        }
+    except Exception as e:
+        logger.error(f"Error checking payment status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check payment status")
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        webhook_url = "dummy_webhook"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        # Handle successful payment
+        if webhook_response.payment_status == "paid":
+            session_id = webhook_response.session_id
+            metadata = webhook_response.metadata
+            user_id = metadata.get("user_id")
+            
+            if user_id:
+                # Check if already processed
+                transaction = await db.payment_transactions.find_one(
+                    {"session_id": session_id},
+                    {"_id": 0}
+                )
+                
+                if transaction and transaction.get("payment_status") != "paid":
+                    # Update transaction
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {
+                            "$set": {
+                                "payment_status": "paid",
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }
+                        }
+                    )
+                    
+                    # Update user
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {"$set": {"payment_paid": True}}
+                    )
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 
