@@ -62,6 +62,7 @@ class User(BaseModel):
     contact: str
     created_at: str
     payment_paid: bool = False
+    payment_status: str = "unpaid"  # unpaid, pending, paid
 
 class LoginResponse(BaseModel):
     token: str
@@ -75,14 +76,6 @@ class StudentProfile(BaseModel):
     college: str
     class_name: str
     stream: str
-
-class PaymentSessionRequest(BaseModel):
-    origin_url: str
-
-class PaymentSessionResponse(BaseModel):
-    url: str
-    session_id: str
-    amount: float
 
 # Helper Functions
 def hash_password(password: str) -> str:
