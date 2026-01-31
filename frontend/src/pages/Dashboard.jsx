@@ -37,6 +37,13 @@ export default function Dashboard() {
     }
 
     const storedUser = JSON.parse(localStorage.getItem("user"));
+    
+    // Check if payment is completed
+    if (!storedUser?.payment_paid) {
+      navigate("/payment");
+      return;
+    }
+    
     setUser(storedUser);
   }, [navigate]);
 
