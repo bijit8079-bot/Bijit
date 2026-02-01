@@ -90,6 +90,7 @@ export default function EditProfile() {
       if (formData.college !== user.college) formDataToSend.append("college", formData.college);
       if (formData.class_name !== user.class_name) formDataToSend.append("class_name", formData.class_name);
       if (formData.stream !== user.stream) formDataToSend.append("stream", formData.stream);
+      if (formData.coaching_center !== user.coaching_center) formDataToSend.append("coaching_center", formData.coaching_center);
       if (photo) formDataToSend.append("photo", photo);
 
       await axios.put(`${API}/profile`, formDataToSend, {
