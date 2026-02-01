@@ -28,33 +28,18 @@ JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
 
 # Payment Configuration
-MEMBERSHIP_FEE = 299.00  # Annual membership fee in INR
+MEMBERSHIP_FEE = 299.00
 
 # Owner credentials
 OWNER_CONTACT = os.environ['OWNER_CONTACT']
 OWNER_PASSWORD = os.environ['OWNER_PASSWORD']
 
-# Create the main app without a prefix
+# Create the main app
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
-
 security = HTTPBearer()
 
 # Define Models
-class UserRegister(BaseModel):
-    name: str
-    college: str
-    class_name: str = Field(alias="class")
-    stream: str
-    contact: str
-    password: str
-
-class UserLogin(BaseModel):
-    contact: str
-    password: str
-
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -66,9 +51,10 @@ class User(BaseModel):
     contact: str
     created_at: str
     payment_paid: bool = False
-    payment_status: str = "unpaid"  # unpaid, pending, paid
-    role: str = "student"  # student, owner
+    payment_status: str = "unpaid"
+    role: str = "student"
     photo: Optional[str] = None
+    coaching_center: Optional[str] = None
 
 class LoginResponse(BaseModel):
     token: str
@@ -83,12 +69,21 @@ class StudentProfile(BaseModel):
     class_name: str
     stream: str
     photo: Optional[str] = None
+    coaching_center: Optional[str] = None
 
-class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    college: Optional[str] = None
-    class_name: Optional[str] = None
-    stream: Optional[str] = None
+class CoachingCenter(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    description: Optional[str] = None
+    created_at: str
+
+class Gym(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    description: Optional[str] = None
+    created_at: str
 
 class AdminUserUpdate(BaseModel):
     payment_paid: Optional[bool] = None
@@ -103,10 +98,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_token(user_id: str) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    payload = {
-        'user_id': user_id,
-        'exp': expiration
-    }
+    payload = {'user_id': user_id, 'exp': expiration}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
@@ -125,7 +117,19 @@ async def verify_owner(user_id: str = Depends(verify_token)) -> str:
         raise HTTPException(status_code=403, detail="Owner access required")
     return user_id
 
-# Routes
+# Auth Routes
+class UserRegister(BaseModel):
+    name: str
+    college: str
+    class_name: str = Field(alias="class")
+    stream: str
+    contact: str
+    password: str
+
+class UserLogin(BaseModel):
+    contact: str
+    password: str
+
 @api_router.get("/")
 async def root():
     return {"message": "StudentsNet API"}
@@ -140,18 +144,15 @@ async def register(
     password: str = Form(...),
     photo: Optional[UploadFile] = File(None)
 ):
-    # Check if user already exists
     existing_user = await db.users.find_one({"contact": contact}, {"_id": 0})
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this contact already exists")
     
-    # Process photo if provided
     photo_base64 = None
     if photo:
         photo_data = await photo.read()
         photo_base64 = base64.b64encode(photo_data).decode('utf-8')
     
-    # Create user document
     user_id = str(uuid.uuid4())
     user_doc = {
         "id": user_id,
@@ -165,60 +166,27 @@ async def register(
         "payment_status": "unpaid",
         "role": "student",
         "photo": photo_base64,
+        "coaching_center": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.users.insert_one(user_doc)
-    
-    # Create token
     token = create_token(user_id)
     
-    # Return user without password
-    user = User(
-        id=user_doc["id"],
-        name=user_doc["name"],
-        college=user_doc["college"],
-        class_name=user_doc["class_name"],
-        stream=user_doc["stream"],
-        contact=user_doc["contact"],
-        created_at=user_doc["created_at"],
-        payment_paid=user_doc["payment_paid"],
-        payment_status=user_doc["payment_status"],
-        role=user_doc["role"],
-        photo=user_doc["photo"]
-    )
-    
+    user = User(**{k: v for k, v in user_doc.items() if k != 'password_hash'})
     return LoginResponse(token=token, user=user)
 
 @api_router.post("/login", response_model=LoginResponse)
 async def login(login_data: UserLogin):
-    # Find user by contact
     user_doc = await db.users.find_one({"contact": login_data.contact}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Verify password
     if not verify_password(login_data.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Create token
     token = create_token(user_doc["id"])
-    
-    # Return user without password
-    user = User(
-        id=user_doc["id"],
-        name=user_doc["name"],
-        college=user_doc["college"],
-        class_name=user_doc["class_name"],
-        stream=user_doc["stream"],
-        contact=user_doc["contact"],
-        created_at=user_doc["created_at"],
-        payment_paid=user_doc.get("payment_paid", False),
-        payment_status=user_doc.get("payment_status", "unpaid"),
-        role=user_doc.get("role", "student"),
-        photo=user_doc.get("photo")
-    )
-    
+    user = User(**{k: v for k, v in user_doc.items() if k != 'password_hash'})
     return LoginResponse(token=token, user=user)
 
 @api_router.get("/profile", response_model=User)
@@ -226,7 +194,6 @@ async def get_profile(user_id: str = Depends(verify_token)):
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
-    
     return User(**user_doc)
 
 @api_router.put("/profile")
@@ -236,18 +203,15 @@ async def update_profile(
     college: Optional[str] = Form(None),
     class_name: Optional[str] = Form(None),
     stream: Optional[str] = Form(None),
+    coaching_center: Optional[str] = Form(None),
     photo: Optional[UploadFile] = File(None)
 ):
     update_data = {}
-    
-    if name:
-        update_data["name"] = name
-    if college:
-        update_data["college"] = college
-    if class_name:
-        update_data["class_name"] = class_name
-    if stream:
-        update_data["stream"] = stream
+    if name: update_data["name"] = name
+    if college: update_data["college"] = college
+    if class_name: update_data["class_name"] = class_name
+    if stream: update_data["stream"] = stream
+    if coaching_center: update_data["coaching_center"] = coaching_center
     if photo:
         photo_data = await photo.read()
         update_data["photo"] = base64.b64encode(photo_data).decode('utf-8')
@@ -255,20 +219,16 @@ async def update_profile(
     if not update_data:
         raise HTTPException(status_code=400, detail="No data to update")
     
-    await db.users.update_one(
-        {"id": user_id},
-        {"$set": update_data}
-    )
-    
+    await db.users.update_one({"id": user_id}, {"$set": update_data})
     return {"message": "Profile updated successfully"}
 
+# Students Routes
 @api_router.get("/students", response_model=List[StudentProfile])
-async def get_students(stream: Optional[str] = None, user_id: str = Depends(verify_token)):
+async def get_students(coaching_center: Optional[str] = None, user_id: str = Depends(verify_token)):
     query = {"role": "student"}
-    if stream:
-        query["stream"] = stream
+    if coaching_center:
+        query["coaching_center"] = coaching_center
     
-    # Exclude current user and password
     students = await db.users.find(
         {**query, "id": {"$ne": user_id}},
         {"_id": 0, "password_hash": 0, "contact": 0, "created_at": 0}
@@ -278,22 +238,69 @@ async def get_students(stream: Optional[str] = None, user_id: str = Depends(veri
 
 @api_router.get("/students/all", response_model=List[StudentProfile])
 async def get_all_students(user_id: str = Depends(verify_token)):
-    # Get all students (excluding current user)
     students = await db.users.find(
         {"role": "student", "id": {"$ne": user_id}},
         {"_id": 0, "password_hash": 0, "contact": 0, "created_at": 0, "payment_status": 0, "payment_paid": 0}
     ).to_list(1000)
-    
     return [StudentProfile(**student) for student in students]
 
-# UPI Payment Routes
+# Coaching Centers Routes
+@api_router.get("/coaching-centers", response_model=List[CoachingCenter])
+async def get_coaching_centers(user_id: str = Depends(verify_token)):
+    centers = await db.coaching_centers.find({}, {"_id": 0}).to_list(1000)
+    return [CoachingCenter(**center) for center in centers]
+
+@api_router.post("/coaching-centers")
+async def create_coaching_center(name: str = Form(...), description: str = Form(None), owner_id: str = Depends(verify_owner)):
+    center_id = str(uuid.uuid4())
+    center_doc = {
+        "id": center_id,
+        "name": name,
+        "description": description,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.coaching_centers.insert_one(center_doc)
+    return CoachingCenter(**center_doc)
+
+@api_router.delete("/coaching-centers/{center_id}")
+async def delete_coaching_center(center_id: str, owner_id: str = Depends(verify_owner)):
+    result = await db.coaching_centers.delete_one({"id": center_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Coaching center not found")
+    return {"message": "Coaching center deleted"}
+
+# Gyms Routes
+@api_router.get("/gyms", response_model=List[Gym])
+async def get_gyms(user_id: str = Depends(verify_token)):
+    gyms = await db.gyms.find({}, {"_id": 0}).to_list(1000)
+    return [Gym(**gym) for gym in gyms]
+
+@api_router.post("/gyms")
+async def create_gym(name: str = Form(...), description: str = Form(None), owner_id: str = Depends(verify_owner)):
+    gym_id = str(uuid.uuid4())
+    gym_doc = {
+        "id": gym_id,
+        "name": name,
+        "description": description,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.gyms.insert_one(gym_doc)
+    return Gym(**gym_doc)
+
+@api_router.delete("/gyms/{gym_id}")
+async def delete_gym(gym_id: str, owner_id: str = Depends(verify_owner)):
+    result = await db.gyms.delete_one({"id": gym_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Gym not found")
+    return {"message": "Gym deleted"}
+
+# Payment Routes
 @api_router.post("/payment/submit-upi")
 async def submit_upi_payment(
     transaction_id: str = Form(...),
     screenshot: UploadFile = File(...),
     user_id: str = Depends(verify_token)
 ):
-    # Check if user already paid
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
@@ -301,15 +308,12 @@ async def submit_upi_payment(
     if user_doc.get("payment_paid", False):
         raise HTTPException(status_code=400, detail="Payment already completed")
     
-    # Check if payment is already pending verification
     if user_doc.get("payment_status") == "pending":
         raise HTTPException(status_code=400, detail="Payment already submitted and pending verification")
     
-    # Read screenshot file
     screenshot_data = await screenshot.read()
     screenshot_base64 = base64.b64encode(screenshot_data).decode('utf-8')
     
-    # Create payment transaction record
     transaction_doc = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -325,18 +329,9 @@ async def submit_upi_payment(
     }
     
     await db.payment_transactions.insert_one(transaction_doc)
+    await db.users.update_one({"id": user_id}, {"$set": {"payment_status": "pending"}})
     
-    # Update user payment status to pending
-    await db.users.update_one(
-        {"id": user_id},
-        {"$set": {"payment_status": "pending"}}
-    )
-    
-    return {
-        "message": "Payment submitted for verification",
-        "status": "pending",
-        "transaction_id": transaction_id
-    }
+    return {"message": "Payment submitted for verification", "status": "pending", "transaction_id": transaction_id}
 
 @api_router.get("/payment/status")
 async def get_payment_status(user_id: str = Depends(verify_token)):
@@ -349,40 +344,44 @@ async def get_payment_status(user_id: str = Depends(verify_token)):
         "payment_status": user_doc.get("payment_status", "unpaid")
     }
 
-# Owner/Admin Routes
+# Admin Routes
 @api_router.get("/admin/users")
 async def get_all_users(owner_id: str = Depends(verify_owner)):
-    users = await db.users.find(
-        {},
-        {"_id": 0, "password_hash": 0}
-    ).to_list(1000)
-    
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
 @api_router.get("/admin/payments")
 async def get_pending_payments(owner_id: str = Depends(verify_owner)):
-    payments = await db.payment_transactions.find(
-        {"payment_status": "pending"},
-        {"_id": 0}
-    ).to_list(1000)
-    
+    payments = await db.payment_transactions.find({"payment_status": "pending"}, {"_id": 0}).to_list(1000)
     return payments
+
+@api_router.get("/admin/stats")
+async def get_admin_stats(owner_id: str = Depends(verify_owner)):
+    total_users = await db.users.count_documents({"role": "student"})
+    paid_users = await db.users.count_documents({"role": "student", "payment_paid": True})
+    pending_payments = await db.payment_transactions.count_documents({"payment_status": "pending"})
+    total_coaching = await db.coaching_centers.count_documents({})
+    total_gyms = await db.gyms.count_documents({})
+    
+    return {
+        "total_users": total_users,
+        "paid_users": paid_users,
+        "unpaid_users": total_users - paid_users,
+        "pending_payments": pending_payments,
+        "total_coaching_centers": total_coaching,
+        "total_gyms": total_gyms
+    }
 
 @api_router.put("/admin/user/{user_id}/payment")
 async def approve_payment(user_id: str, update_data: AdminUserUpdate, owner_id: str = Depends(verify_owner)):
     update_fields = {}
-    
     if update_data.payment_paid is not None:
         update_fields["payment_paid"] = update_data.payment_paid
     if update_data.payment_status:
         update_fields["payment_status"] = update_data.payment_status
     
-    await db.users.update_one(
-        {"id": user_id},
-        {"$set": update_fields}
-    )
+    await db.users.update_one({"id": user_id}, {"$set": update_fields})
     
-    # Update payment transaction if approving
     if update_data.payment_paid:
         await db.payment_transactions.update_many(
             {"user_id": user_id, "payment_status": "pending"},
@@ -396,10 +395,8 @@ async def delete_user(user_id: str, owner_id: str = Depends(verify_owner)):
     result = await db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    
     return {"message": "User deleted successfully"}
 
-# Include the router in the main app
 app.include_router(api_router)
 
 app.add_middleware(
@@ -410,16 +407,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup_event():
-    # Create owner account if doesn't exist
     owner = await db.users.find_one({"contact": OWNER_CONTACT}, {"_id": 0})
     if not owner:
         owner_doc = {
@@ -434,6 +426,7 @@ async def startup_event():
             "payment_status": "paid",
             "role": "owner",
             "photo": None,
+            "coaching_center": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.users.insert_one(owner_doc)
