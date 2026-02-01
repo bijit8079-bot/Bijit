@@ -105,7 +105,7 @@ export default function Dashboard() {
   };
 
   const handleGymClick = (gym) => {
-    toast.info(`${gym.name} - ${gym.description || "Gym information}`);
+    toast.info(`${gym.name} - ${gym.description || "Gym information"}`);
   };
 
   const handleBackToStreams = () => {
