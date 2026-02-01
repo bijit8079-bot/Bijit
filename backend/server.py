@@ -247,16 +247,25 @@ async def get_all_students(user_id: str = Depends(verify_token)):
 
 # Coaching Centers Routes
 @api_router.get("/coaching-centers", response_model=List[CoachingCenter])
-async def get_coaching_centers(user_id: str = Depends(verify_token)):
-    centers = await db.coaching_centers.find({}, {"_id": 0}).to_list(1000)
+async def get_coaching_centers(stream: Optional[str] = None, user_id: str = Depends(verify_token)):
+    query = {}
+    if stream:
+        query["stream"] = stream
+    centers = await db.coaching_centers.find(query, {"_id": 0}).to_list(1000)
     return [CoachingCenter(**center) for center in centers]
 
 @api_router.post("/coaching-centers")
-async def create_coaching_center(name: str = Form(...), description: str = Form(None), owner_id: str = Depends(verify_owner)):
+async def create_coaching_center(
+    name: str = Form(...),
+    stream: str = Form(...),
+    description: str = Form(None),
+    owner_id: str = Depends(verify_owner)
+):
     center_id = str(uuid.uuid4())
     center_doc = {
         "id": center_id,
         "name": name,
+        "stream": stream,
         "description": description,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
