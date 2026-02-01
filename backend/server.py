@@ -225,8 +225,14 @@ async def update_profile(
 
 # Students Routes
 @api_router.get("/students", response_model=List[StudentProfile])
-async def get_students(coaching_center: Optional[str] = None, user_id: str = Depends(verify_token)):
+async def get_students(
+    stream: Optional[str] = None,
+    coaching_center: Optional[str] = None,
+    user_id: str = Depends(verify_token)
+):
     query = {"role": "student"}
+    if stream:
+        query["stream"] = stream
     if coaching_center:
         query["coaching_center"] = coaching_center
     
