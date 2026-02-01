@@ -75,6 +75,7 @@ class CoachingCenter(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     name: str
+    stream: str  # Arts, Commerce, Science
     description: Optional[str] = None
     created_at: str
 
