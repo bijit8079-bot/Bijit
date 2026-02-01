@@ -21,6 +21,7 @@ export default function Payment() {
   const [transactionId, setTransactionId] = useState("");
   const [screenshot, setScreenshot] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
+  const [pollingActive, setPollingActive] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -35,8 +36,41 @@ export default function Payment() {
     // If payment already done, redirect to dashboard
     if (storedUser?.payment_paid) {
       navigate("/dashboard");
+      return;
+    }
+
+    // Start polling if payment is pending
+    if (storedUser?.payment_status === "pending") {
+      setPollingActive(true);
+      startPolling();
     }
   }, [navigate]);
+
+  const startPolling = async () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${API}/payment/status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.data.payment_paid) {
+          clearInterval(pollInterval);
+          const storedUser = JSON.parse(localStorage.getItem("user"));
+          storedUser.payment_paid = true;
+          storedUser.payment_status = "paid";
+          localStorage.setItem("user", JSON.stringify(storedUser));
+          toast.success("Payment approved! Redirecting to dashboard...");
+          setTimeout(() => navigate("/dashboard"), 1500);
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Stop polling after 10 minutes
+    setTimeout(() => clearInterval(pollInterval), 600000);
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
