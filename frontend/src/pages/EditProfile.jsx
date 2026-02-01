@@ -218,6 +218,23 @@ export default function EditProfile() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="coaching_center">Which Coaching Are You Going?</Label>
+                <Select value={formData.coaching_center} onValueChange={handleCoachingChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select coaching center (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {coachingCenters.map((coaching) => (
+                      <SelectItem key={coaching.id} value={coaching.name}>
+                        {coaching.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button type="submit" className="w-full" disabled={loading}>
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? "Saving..." : "Save Changes"}
