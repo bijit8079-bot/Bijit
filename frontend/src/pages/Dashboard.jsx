@@ -5,18 +5,30 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { LogOut, GraduationCap, Users, UserCircle, Settings, BookOpen, Dumbbell } from "lucide-react";
+import { LogOut, GraduationCap, Users, UserCircle, Settings, BookOpen, Briefcase, FlaskConical, Dumbbell } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+const streamIcons = {
+  Arts: BookOpen,
+  Commerce: Briefcase,
+  Science: FlaskConical
+};
+
+const streamColors = {
+  Arts: "bg-orange-50 hover:bg-orange-100 border-orange-200",
+  Commerce: "bg-blue-50 hover:bg-blue-100 border-blue-200",
+  Science: "bg-green-50 hover:bg-green-100 border-green-200"
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [selectedStream, setSelectedStream] = useState(null);
+  const [selectedCoaching, setSelectedCoaching] = useState(null);
   const [coachingCenters, setCoachingCenters] = useState([]);
   const [gyms, setGyms] = useState([]);
-  const [selectedCoaching, setSelectedCoaching] = useState(null);
-  const [selectedGym, setSelectedGym] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -35,21 +47,8 @@ export default function Dashboard() {
     }
     
     setUser(storedUser);
-    fetchCoachingCenters();
     fetchGyms();
   }, [navigate]);
-
-  const fetchCoachingCenters = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API}/coaching-centers`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCoachingCenters(response.data);
-    } catch (error) {
-      console.error("Failed to load coaching centers");
-    }
-  };
 
   const fetchGyms = async () => {
     try {
@@ -70,16 +69,33 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const handleCoachingClick = async (coaching) => {
-    setSelectedCoaching(coaching);
-    setSelectedGym(null);
+  const handleStreamClick = async (stream) => {
+    setSelectedStream(stream);
     setLoading(true);
 
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${API}/students?coaching_center=${coaching.name}`, {
+      const response = await axios.get(`${API}/coaching-centers?stream=${stream}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setCoachingCenters(response.data);
+    } catch (error) {
+      toast.error("Failed to load coaching centers");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCoachingClick = async (coaching) => {
+    setSelectedCoaching(coaching);
+    setLoading(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${API}/students?stream=${selectedStream}&coaching_center=${coaching.name}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setStudents(response.data);
     } catch (error) {
       toast.error("Failed to load students");
@@ -89,14 +105,18 @@ export default function Dashboard() {
   };
 
   const handleGymClick = (gym) => {
-    setSelectedGym(gym);
-    setSelectedCoaching(null);
-    toast.info(`Gym: ${gym.name} - ${gym.description || "No description available"}`);
+    toast.info(`${gym.name} - ${gym.description || "Gym information"}");
   };
 
-  const handleBack = () => {
+  const handleBackToStreams = () => {
+    setSelectedStream(null);
     setSelectedCoaching(null);
-    setSelectedGym(null);
+    setCoachingCenters([]);
+    setStudents([]);
+  };
+
+  const handleBackToCoaching = () => {
+    setSelectedCoaching(null);
     setStudents([]);
   };
 
@@ -173,42 +193,38 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Main Content */}
-        {!selectedCoaching ? (
+        {/* Main Content - 3 Level View */}
+        {!selectedStream ? (
+          // Level 1: Show Streams
           <>
-            {/* Coaching Centers Section */}
             <div className="mb-8">
               <div className="flex items-center mb-6">
                 <BookOpen className="h-6 w-6 mr-2 text-gray-700" />
-                <h2 className="text-2xl font-bold text-gray-900">Coaching Centers Connected With Us</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Select Stream to View Coaching Centers</h2>
               </div>
-              {coachingCenters.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-gray-500">No coaching centers added yet</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {coachingCenters.map((coaching) => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {["Arts", "Commerce", "Science"].map((stream) => {
+                  const Icon = streamIcons[stream];
+                  return (
                     <Card
-                      key={coaching.id}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-lg border-2 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                      onClick={() => handleCoachingClick(coaching)}
+                      key={stream}
+                      className={`cursor-pointer transition-all duration-200 hover:shadow-lg border-2 ${streamColors[stream]}`}
+                      onClick={() => handleStreamClick(stream)}
+                      data-testid={`stream-card-${stream.toLowerCase()}`}
                     >
                       <CardHeader className="text-center">
                         <div className="flex justify-center mb-2">
                           <div className="p-4 bg-white rounded-full shadow-sm">
-                            <BookOpen className="h-10 w-10 text-blue-600" />
+                            <Icon className="h-10 w-10 text-gray-700" />
                           </div>
                         </div>
-                        <CardTitle className="text-xl">{coaching.name}</CardTitle>
-                        <CardDescription>{coaching.description || "Click to view students"}</CardDescription>
+                        <CardTitle className="text-2xl">{stream}</CardTitle>
+                        <CardDescription>Click to view coaching centers</CardDescription>
                       </CardHeader>
                     </Card>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
 
             {/* Gyms Section */}
@@ -246,8 +262,53 @@ export default function Dashboard() {
               )}
             </div>
           </>
+        ) : !selectedCoaching ? (
+          // Level 2: Show Coaching Centers for selected stream
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <BookOpen className="h-6 w-6 mr-2 text-gray-700" />
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedStream} Coaching Centers
+                </h2>
+              </div>
+              <Button onClick={handleBackToStreams}>Back to Streams</Button>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Loading coaching centers...</p>
+              </div>
+            ) : coachingCenters.length === 0 ? (
+              <Card className="shadow-md">
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500">No coaching centers found for {selectedStream} stream.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {coachingCenters.map((coaching) => (
+                  <Card
+                    key={coaching.id}
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-lg border-2 ${streamColors[selectedStream]}`}
+                    onClick={() => handleCoachingClick(coaching)}
+                  >
+                    <CardHeader className="text-center">
+                      <div className="flex justify-center mb-2">
+                        <div className="p-4 bg-white rounded-full shadow-sm">
+                          <BookOpen className="h-10 w-10 text-blue-600" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-xl">{coaching.name}</CardTitle>
+                      <CardDescription>{coaching.description || "Click to view students"}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
-          // Students List View
+          // Level 3: Show Students for selected coaching center
           <div>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
@@ -256,7 +317,7 @@ export default function Dashboard() {
                   Students at {selectedCoaching.name}
                 </h2>
               </div>
-              <Button onClick={handleBack}>Back</Button>
+              <Button onClick={handleBackToCoaching}>Back to Coaching Centers</Button>
             </div>
 
             {loading ? (
@@ -288,11 +349,9 @@ export default function Dashboard() {
                           <h3 className="font-semibold text-lg">{student.name}</h3>
                           <p className="text-sm text-gray-600">{student.college}</p>
                           <p className="text-xs text-gray-500 mt-1">{student.class_name}</p>
-                          {student.coaching_center && (
-                            <p className="text-xs text-primary font-semibold mt-1">
-                              {student.coaching_center}
-                            </p>
-                          )}
+                          <p className="text-xs text-primary font-semibold mt-1">
+                            {student.coaching_center}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
