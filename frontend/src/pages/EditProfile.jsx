@@ -17,13 +17,15 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [coachingCenters, setCoachingCenters] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     college: "",
     class_name: "",
-    stream: ""
+    stream: "",
+    coaching_center: ""
   });
 
   useEffect(() => {
@@ -34,13 +36,27 @@ export default function EditProfile() {
         name: storedUser.name,
         college: storedUser.college,
         class_name: storedUser.class_name,
-        stream: storedUser.stream
+        stream: storedUser.stream,
+        coaching_center: storedUser.coaching_center || ""
       });
       if (storedUser.photo) {
         setPhotoPreview(`data:image/jpeg;base64,${storedUser.photo}`);
       }
     }
+    fetchCoachingCenters();
   }, []);
+
+  const fetchCoachingCenters = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/coaching-centers`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCoachingCenters(response.data);
+    } catch (error) {
+      console.error("Failed to load coaching centers");
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
