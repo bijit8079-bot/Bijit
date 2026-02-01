@@ -66,6 +66,10 @@ export default function EditProfile() {
     setFormData({ ...formData, stream: value });
   };
 
+  const handleCoachingChange = (value) => {
+    setFormData({ ...formData, coaching_center: value });
+  };
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
