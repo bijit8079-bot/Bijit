@@ -185,7 +185,9 @@ async def root():
     return {"message": "StudentsNet API"}
 
 @api_router.post("/register", response_model=LoginResponse)
+@limiter.limit(RateLimitConfig.REGISTER_LIMIT)
 async def register(
+    request: Request,
     name: str = Form(...),
     college: str = Form(...),
     class_name: str = Form(..., alias="class"),
@@ -194,15 +196,57 @@ async def register(
     password: str = Form(...),
     photo: Optional[UploadFile] = File(None)
 ):
-    existing_user = await db.users.find_one({"contact": contact}, {"_id": 0})
+    client_ip = get_client_ip(request)
+    
+    # Input validation and sanitization
+    name = InputValidator.sanitize_string(name, 100)
+    college = InputValidator.sanitize_string(college, 200)
+    class_name = InputValidator.sanitize_string(class_name, 50)
+    stream = InputValidator.sanitize_string(stream, 50)
+    contact = InputValidator.sanitize_string(contact, 20)
+    
+    # Validate inputs
+    if not InputValidator.validate_name(name):
+        raise HTTPException(status_code=400, detail="Invalid name format")
+    
+    if not InputValidator.validate_phone(contact):
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    
+    is_valid_password, password_error = InputValidator.validate_password(password)
+    if not is_valid_password:
+        raise HTTPException(status_code=400, detail=password_error)
+    
+    if stream not in ["Arts", "Commerce", "Science"]:
+        raise HTTPException(status_code=400, detail="Invalid stream selection")
+    
+    # Sanitize contact for database query
+    sanitized_contact = QuerySanitizer.sanitize_mongodb_query(contact)
+    
+    # Check if user already exists
+    existing_user = await db.users.find_one({"contact": sanitized_contact}, {"_id": 0})
     if existing_user:
+        AuditLogger.log_security_event("DUPLICATE_REGISTRATION", f"Contact: {contact}", client_ip)
         raise HTTPException(status_code=400, detail="User with this contact already exists")
     
+    # Process photo if provided
     photo_base64 = None
     if photo:
+        is_valid_file, file_error = InputValidator.validate_file_upload(
+            photo.filename, 
+            photo.content_type
+        )
+        if not is_valid_file:
+            raise HTTPException(status_code=400, detail=file_error)
+        
         photo_data = await photo.read()
+        
+        # Check file size (max 5MB)
+        if len(photo_data) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Maximum 5MB allowed")
+        
         photo_base64 = base64.b64encode(photo_data).decode('utf-8')
     
+    # Create user document
     user_id = str(uuid.uuid4())
     user_doc = {
         "id": user_id,
@@ -210,19 +254,24 @@ async def register(
         "college": college,
         "class_name": class_name,
         "stream": stream,
-        "contact": contact,
+        "contact": sanitized_contact,
         "password_hash": hash_password(password),
         "payment_paid": False,
         "payment_status": "unpaid",
         "role": "student",
         "photo": photo_base64,
         "coaching_center": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_login": None,
+        "failed_login_attempts": 0
     }
     
     await db.users.insert_one(user_doc)
-    token = create_token(user_id)
     
+    # Audit log
+    AuditLogger.log_data_access(user_id, "CREATE", "USER", client_ip)
+    
+    token = create_token(user_id)
     user = User(**{k: v for k, v in user_doc.items() if k != 'password_hash'})
     return LoginResponse(token=token, user=user)
 
