@@ -287,9 +287,12 @@ export default function AdminPanel() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="coaching" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-12">
+          <TabsList className="grid w-full grid-cols-5 h-12">
             <TabsTrigger value="coaching" className="text-base">
               Coaching ({coachingCenters.length})
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="text-base">
+              Student Attendance
             </TabsTrigger>
             <TabsTrigger value="gyms" className="text-base">
               Gyms ({gyms.length})
