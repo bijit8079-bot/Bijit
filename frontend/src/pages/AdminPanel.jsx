@@ -27,8 +27,11 @@ export default function AdminPanel() {
   // Form states
   const [newCoaching, setNewCoaching] = useState({ name: "", stream: "", description: "" });
   const [newGym, setNewGym] = useState({ name: "", description: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", contact: "", password: "", staff_type: "" });
+  const [staff, setStaff] = useState([]);
   const [showCoachingDialog, setShowCoachingDialog] = useState(false);
   const [showGymDialog, setShowGymDialog] = useState(false);
+  const [showStaffDialog, setShowStaffDialog] = useState(false);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user"));
