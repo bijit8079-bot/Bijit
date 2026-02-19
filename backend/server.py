@@ -479,6 +479,7 @@ async def submit_upi_payment(
     )
     if not is_valid_file:
         raise HTTPException(status_code=400, detail=file_error)
+    
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
@@ -490,7 +491,15 @@ async def submit_upi_payment(
         raise HTTPException(status_code=400, detail="Payment already submitted and pending verification")
     
     screenshot_data = await screenshot.read()
+    
+    # Check file size
+    if len(screenshot_data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum 5MB")
+    
     screenshot_base64 = base64.b64encode(screenshot_data).decode('utf-8')
+    
+    # Audit log
+    AuditLogger.log_data_access(user_id, "SUBMIT_PAYMENT", "PAYMENT_TRANSACTION", client_ip)
     
     transaction_doc = {
         "id": str(uuid.uuid4()),
