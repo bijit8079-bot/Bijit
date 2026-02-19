@@ -188,6 +188,17 @@ def create_token(user_id: str, remember_me: bool = False) -> str:
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     try:
         token = credentials.credentials
+        
+        # Check if token is blacklisted (logged out)
+        if TokenBlacklist.is_blacklisted(token):
+            SecurityEventLogger.log_security_event(
+                "BLACKLISTED_TOKEN_USAGE",
+                "HIGH",
+                {"token_prefix": token[:10]},
+                "unknown"
+            )
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+        
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         
         # Check token expiration
