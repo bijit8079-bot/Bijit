@@ -49,6 +49,7 @@ MEMBERSHIP_FEE = 299.00
 # Owner credentials
 OWNER_CONTACT = os.environ['OWNER_CONTACT']
 OWNER_PASSWORD = os.environ['OWNER_PASSWORD']
+OWNER_NAME = os.environ.get('OWNER_NAME', 'Owner')
 
 # Create the main app
 app = FastAPI()
