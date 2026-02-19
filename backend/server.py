@@ -458,11 +458,27 @@ async def delete_gym(gym_id: str, owner_id: str = Depends(verify_owner)):
 
 # Payment Routes
 @api_router.post("/payment/submit-upi")
+@limiter.limit(RateLimitConfig.PAYMENT_LIMIT)
 async def submit_upi_payment(
+    request: Request,
     transaction_id: str = Form(...),
     screenshot: UploadFile = File(...),
     user_id: str = Depends(verify_token)
 ):
+    client_ip = get_client_ip(request)
+    
+    # Validate and sanitize transaction ID
+    transaction_id = InputValidator.sanitize_string(transaction_id, 50)
+    if not transaction_id or len(transaction_id) < 8:
+        raise HTTPException(status_code=400, detail="Invalid transaction ID")
+    
+    # Validate file upload
+    is_valid_file, file_error = InputValidator.validate_file_upload(
+        screenshot.filename, 
+        screenshot.content_type
+    )
+    if not is_valid_file:
+        raise HTTPException(status_code=400, detail=file_error)
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
