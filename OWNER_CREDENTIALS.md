@@ -2,8 +2,9 @@
 
 ## Owner Login Details
 
-**Contact/Username:** `owner@studentsnet`  
-**Password:** `owner@2025`
+**Name:** Bijit Das  
+**Contact/Phone:** `6003416826`  
+**Password:** `bijit1611`
 
 ## Owner Access & Permissions
 
