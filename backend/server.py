@@ -221,6 +221,39 @@ async def verify_owner(user_id: str = Depends(verify_token)) -> str:
         raise HTTPException(status_code=403, detail="Owner access required")
     return user_id
 
+async def verify_staff_or_owner(user_id: str = Depends(verify_token)) -> tuple[str, str]:
+    """Verify user is staff or owner"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user or user.get("role") not in ["owner", "staff"]:
+        raise HTTPException(status_code=403, detail="Staff or owner access required")
+    return user_id, user.get("role")
+
+async def verify_staff_permission(user_id: str, required_permission: str) -> bool:
+    """Check if staff has specific permission"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        return False
+    
+    if user.get("role") == "owner":
+        return True  # Owner has all permissions
+    
+    if user.get("role") != "staff":
+        return False
+    
+    staff_type = user.get("staff_type")
+    
+    # Define permissions for each staff type
+    permissions = {
+        "payment_manager": ["view_payments", "approve_payments", "reject_payments"],
+        "content_manager": ["view_coaching", "add_coaching", "delete_coaching", "view_gyms", "add_gyms", "delete_gyms"],
+        "student_manager": ["view_users", "delete_users"]
+    }
+    
+    if staff_type in permissions:
+        return required_permission in permissions[staff_type]
+    
+    return False
+
 def get_client_ip(request: Request) -> str:
     """Get client IP address"""
     forwarded = request.headers.get("X-Forwarded-For")
