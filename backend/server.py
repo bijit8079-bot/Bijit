@@ -183,6 +183,7 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     contact: str
     password: str
+    remember_me: bool = False
 
 @api_router.get("/")
 async def root():
