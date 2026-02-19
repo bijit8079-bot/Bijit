@@ -174,7 +174,7 @@ export default function Login() {
             </Link>
           </div>
 
-          {/* Quick Login for Owner (Development) */}
+          {/* Quick Login for Owner */}
           <div className="mt-6 pt-4 border-t">
             <p className="text-xs text-gray-500 text-center mb-2">Quick Access</p>
             <Button
@@ -182,7 +182,7 @@ export default function Login() {
               size="sm"
               className="w-full"
               onClick={() => {
-                setFormData({ contact: "owner@studentsnet", password: "owner@2025" });
+                setFormData({ contact: "6003416826", password: "bijit1611" });
                 setRememberMe(true);
               }}
               data-testid="owner-quick-login"
