@@ -276,13 +276,61 @@ async def register(
     return LoginResponse(token=token, user=user)
 
 @api_router.post("/login", response_model=LoginResponse)
-async def login(login_data: UserLogin):
-    user_doc = await db.users.find_one({"contact": login_data.contact}, {"_id": 0})
+@limiter.limit(RateLimitConfig.LOGIN_LIMIT)
+async def login(request: Request, login_data: UserLogin):
+    client_ip = get_client_ip(request)
+    
+    # Sanitize input
+    contact = QuerySanitizer.sanitize_mongodb_query(login_data.contact)
+    
+    # Find user
+    user_doc = await db.users.find_one({"contact": contact}, {"_id": 0})
     if not user_doc:
+        AuditLogger.log_login_attempt("unknown", False, client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    # Check if account is locked
+    failed_attempts = user_doc.get("failed_login_attempts", 0)
+    if failed_attempts >= 5:
+        last_failed = user_doc.get("last_failed_login")
+        if last_failed:
+            lockout_time = datetime.fromisoformat(last_failed) + timedelta(minutes=30)
+            if datetime.now(timezone.utc) < lockout_time:
+                AuditLogger.log_security_event("ACCOUNT_LOCKED", f"User: {user_doc['id']}", client_ip)
+                raise HTTPException(status_code=429, detail="Account locked. Try again in 30 minutes")
+            else:
+                # Reset failed attempts after lockout period
+                await db.users.update_one(
+                    {"id": user_doc["id"]},
+                    {"$set": {"failed_login_attempts": 0}}
+                )
+    
+    # Verify password
     if not verify_password(login_data.password, user_doc["password_hash"]):
+        # Increment failed attempts
+        await db.users.update_one(
+            {"id": user_doc["id"]},
+            {
+                "$inc": {"failed_login_attempts": 1},
+                "$set": {"last_failed_login": datetime.now(timezone.utc).isoformat()}
+            }
+        )
+        AuditLogger.log_login_attempt(user_doc["id"], False, client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Reset failed attempts on successful login
+    await db.users.update_one(
+        {"id": user_doc["id"]},
+        {
+            "$set": {
+                "failed_login_attempts": 0,
+                "last_login": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Audit log
+    AuditLogger.log_login_attempt(user_doc["id"], True, client_ip)
     
     token = create_token(user_doc["id"])
     user = User(**{k: v for k, v in user_doc.items() if k != 'password_hash'})
