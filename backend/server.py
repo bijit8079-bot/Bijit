@@ -51,6 +51,22 @@ OWNER_PASSWORD = os.environ['OWNER_PASSWORD']
 
 # Create the main app
 app = FastAPI()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        for header, value in SECURITY_HEADERS.items():
+            response.headers[header] = value
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
