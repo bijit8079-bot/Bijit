@@ -337,7 +337,7 @@ async def login(request: Request, login_data: UserLogin):
     # Audit log
     AuditLogger.log_login_attempt(user_doc["id"], True, client_ip)
     
-    token = create_token(user_doc["id"])
+    token = create_token(user_doc["id"], login_data.remember_me)
     user = User(**{k: v for k, v in user_doc.items() if k != 'password_hash'})
     return LoginResponse(token=token, user=user)
 
