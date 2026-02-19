@@ -19,9 +19,14 @@ The owner account has full administrative access to:
 
 1. Go to login page: https://college-signup-1.preview.emergentagent.com/login
 2. Enter credentials:
-   - Contact: `owner@studentsnet`
-   - Password: `owner@2025`
+   - Contact: `6003416826`
+   - Password: `bijit1611`
 3. Click Login
+
+**OR** use Quick Access:
+1. Click "Fill Owner Credentials" button
+2. Click Login
+3. Done!
 
 ## Admin Panel Features
 
