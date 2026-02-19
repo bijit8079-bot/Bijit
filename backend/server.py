@@ -129,7 +129,8 @@ class User(BaseModel):
     created_at: str
     payment_paid: bool = False
     payment_status: str = "unpaid"
-    role: str = "student"
+    role: str = "student"  # student, staff, owner
+    staff_type: Optional[str] = None  # payment_manager, content_manager, student_manager
     photo: Optional[str] = None
     coaching_center: Optional[str] = None
 
