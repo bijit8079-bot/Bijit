@@ -41,6 +41,7 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
+JWT_REMEMBER_ME_DAYS = 30  # 30 days for remember me
 
 # Payment Configuration
 MEMBERSHIP_FEE = 299.00
