@@ -28,6 +28,17 @@ from security import (
     QuerySanitizer,
     SESSION_TIMEOUT_MINUTES
 )
+from advanced_security import (
+    TokenBlacklist,
+    IPSecurityMonitor,
+    AdvancedInputValidator,
+    SessionSecurityManager,
+    CSPGenerator,
+    AntiAutomationDetector,
+    SecurityEventLogger,
+    PasswordStrengthEnforcer,
+    AdvancedSecurityConfig
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
