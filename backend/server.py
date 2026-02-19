@@ -73,9 +73,42 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Security Headers Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Check IP blacklist
+        client_ip = get_client_ip(request)
+        if IPSecurityMonitor.is_blacklisted(client_ip):
+            SecurityEventLogger.log_security_event(
+                "IP_BLACKLISTED_REQUEST",
+                "HIGH",
+                {"path": request.url.path},
+                client_ip
+            )
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Access forbidden"}
+            )
+        
+        # Check for automation/bot patterns
+        if AntiAutomationDetector.is_suspicious_pattern(client_ip):
+            SecurityEventLogger.log_security_event(
+                "BOT_PATTERN_DETECTED",
+                "MEDIUM",
+                {"path": request.url.path},
+                client_ip
+            )
+            IPSecurityMonitor.record_failed_attempt(client_ip)
+        
+        # Record request for pattern analysis
+        AntiAutomationDetector.record_request(client_ip, request.url.path)
+        
         response = await call_next(request)
+        
+        # Add security headers
         for header, value in SECURITY_HEADERS.items():
             response.headers[header] = value
+        
+        # Add strict CSP
+        response.headers["Content-Security-Policy"] = CSPGenerator.generate_strict_csp()
+        
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
