@@ -605,11 +605,12 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup_event():
+    # Create or update owner account
     owner = await db.users.find_one({"contact": OWNER_CONTACT}, {"_id": 0})
     if not owner:
         owner_doc = {
             "id": str(uuid.uuid4()),
-            "name": "Owner",
+            "name": OWNER_NAME,
             "college": "Admin",
             "class_name": "Admin",
             "stream": "Admin",
@@ -624,6 +625,21 @@ async def startup_event():
         }
         await db.users.insert_one(owner_doc)
         logger.info(f"Owner account created: {OWNER_CONTACT}")
+    else:
+        # Update existing owner account with new credentials
+        await db.users.update_one(
+            {"contact": OWNER_CONTACT},
+            {
+                "$set": {
+                    "name": OWNER_NAME,
+                    "password_hash": hash_password(OWNER_PASSWORD),
+                    "role": "owner",
+                    "payment_paid": True,
+                    "payment_status": "paid"
+                }
+            }
+        )
+        logger.info(f"Owner account updated: {OWNER_CONTACT}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
