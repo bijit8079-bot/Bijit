@@ -632,6 +632,77 @@ async def get_all_users(owner_id: str = Depends(verify_owner)):
     users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
+@api_router.post("/admin/staff/create")
+async def create_staff(
+    request: Request,
+    name: str = Form(...),
+    contact: str = Form(...),
+    password: str = Form(...),
+    staff_type: str = Form(...),
+    owner_id: str = Depends(verify_owner)
+):
+    """Create new staff member (owner only)"""
+    client_ip = get_client_ip(request)
+    
+    # Validate staff type
+    valid_staff_types = ["payment_manager", "content_manager", "student_manager"]
+    if staff_type not in valid_staff_types:
+        raise HTTPException(status_code=400, detail="Invalid staff type")
+    
+    # Sanitize inputs
+    name = InputValidator.sanitize_string(name, 100)
+    contact = InputValidator.sanitize_string(contact, 20)
+    
+    if not InputValidator.validate_phone(contact):
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    
+    # Check if already exists
+    existing = await db.users.find_one({"contact": contact}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Contact already registered")
+    
+    # Create staff account
+    staff_id = str(uuid.uuid4())
+    staff_doc = {
+        "id": staff_id,
+        "name": name,
+        "contact": contact,
+        "password_hash": hash_password(password),
+        "role": "staff",
+        "staff_type": staff_type,
+        "college": "Staff",
+        "class_name": "Staff",
+        "stream": "Staff",
+        "payment_paid": True,
+        "payment_status": "paid",
+        "photo": None,
+        "coaching_center": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(staff_doc)
+    
+    AuditLogger.log_data_access(owner_id, "CREATE_STAFF", f"Staff: {staff_id}", client_ip)
+    
+    return {"message": "Staff member created successfully", "staff_id": staff_id}
+
+@api_router.get("/admin/staff")
+async def get_all_staff(owner_id: str = Depends(verify_owner)):
+    """Get all staff members"""
+    staff = await db.users.find(
+        {"role": "staff"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(1000)
+    return staff
+
+@api_router.delete("/admin/staff/{staff_id}")
+async def delete_staff(staff_id: str, owner_id: str = Depends(verify_owner)):
+    """Delete staff member"""
+    result = await db.users.delete_one({"id": staff_id, "role": "staff"})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    return {"message": "Staff member deleted"}
+
 @api_router.get("/admin/payments")
 async def get_pending_payments(owner_id: str = Depends(verify_owner)):
     payments = await db.payment_transactions.find({"payment_status": "pending"}, {"_id": 0}).to_list(1000)
