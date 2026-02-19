@@ -43,7 +43,10 @@ export default function EditProfile() {
         setPhotoPreview(`data:image/jpeg;base64,${storedUser.photo}`);
       }
     }
-    fetchCoachingCenters();
+    // Only fetch coaching centers if user is a student
+    if (storedUser?.role === "student") {
+      fetchCoachingCenters();
+    }
   }, []);
 
   const fetchCoachingCenters = async () => {
