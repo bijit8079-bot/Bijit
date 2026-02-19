@@ -216,10 +216,16 @@ export default function AdminPanel() {
                 <p className="text-purple-100 text-sm">Manage your StudentsNet platform</p>
               </div>
             </div>
-            <Button variant="secondary" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Dashboard
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" onClick={() => navigate("/edit-profile")}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Profile
+              </Button>
+              <Button variant="secondary" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+            </div>
           </div>
         </div>
       </header>
