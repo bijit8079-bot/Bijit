@@ -506,18 +506,23 @@ async def create_coaching_center(
     name: str = Form(...),
     stream: str = Form(...),
     description: str = Form(None),
-    owner_id: str = Depends(verify_owner)
+    user_id: str = Depends(verify_token)
 ):
-    center_id = str(uuid.uuid4())
-    center_doc = {
-        "id": center_id,
-        "name": name,
-        "stream": stream,
-        "description": description,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.coaching_centers.insert_one(center_doc)
-    return CoachingCenter(**center_doc)
+    # Check if user has permission
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if user.get("role") == "owner" or (user.get("role") == "staff" and user.get("staff_type") == "content_manager"):
+        center_id = str(uuid.uuid4())
+        center_doc = {
+            "id": center_id,
+            "name": name,
+            "stream": stream,
+            "description": description,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.coaching_centers.insert_one(center_doc)
+        return CoachingCenter(**center_doc)
+    else:
+        raise HTTPException(status_code=403, detail="Permission denied")
 
 @api_router.delete("/coaching-centers/{center_id}")
 async def delete_coaching_center(center_id: str, owner_id: str = Depends(verify_owner)):
