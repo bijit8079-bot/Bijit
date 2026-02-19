@@ -123,31 +123,49 @@ class AdminUserUpdate(BaseModel):
 
 # Helper Functions
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=PASSWORD_HASH_ROUNDS)).decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 def create_token(user_id: str) -> str:
     expiration = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    payload = {'user_id': user_id, 'exp': expiration}
+    payload = {'user_id': user_id, 'exp': expiration, 'iat': datetime.now(timezone.utc)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     try:
         token = credentials.credentials
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        
+        # Check token expiration
+        exp = payload.get('exp')
+        if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+            raise HTTPException(status_code=401, detail="Token expired")
+        
         return payload['user_id']
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 async def verify_owner(user_id: str = Depends(verify_token)) -> str:
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user or user.get("role") != "owner":
         raise HTTPException(status_code=403, detail="Owner access required")
     return user_id
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0]
+    return request.client.host if request.client else "unknown"
 
 # Auth Routes
 class UserRegister(BaseModel):
